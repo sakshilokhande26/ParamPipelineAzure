@@ -1,0 +1,228 @@
+{
+	"name": "PL_ProcessFiles",
+	"properties": {
+		"activities": [
+			{
+				"name": "GM_ListFilesInFolder",
+				"type": "GetMetadata",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "DS_Blob_CSV",
+						"type": "DatasetReference",
+						"parameters": {
+							"FolderPath": {
+								"value": "@pipeline().parameters.FolderPath",
+								"type": "Expression"
+							},
+							"FileName": "*"
+						}
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings"
+					}
+				}
+			},
+			{
+				"name": "FE_ProcessEachFile",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GM_ListFilesInFolder",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GM_ListFilesInFolder').output.childItems",
+						"type": "Expression"
+					},
+					"batchCount": 5,
+					"activities": [
+						{
+							"name": "AF_CleanData",
+							"type": "AzureFunctionActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"functionName": "CleanDataFunction",
+								"body": {
+									"value": "@json(concat(\n    '{\"fileName\":\"', item().name, \n    '\",\"folderPath\":\"', pipeline().parameters.FolderPath,\n    '\",\"targetTable\":\"', pipeline().parameters.TargetTableName,\n    '\",\"containerName\":\"', pipeline().parameters.ContainerName,\n    '\"}'\n))",
+									"type": "Expression"
+								},
+								"method": "POST"
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_AzureFunction",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "IF_HasDirtyRows",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "AF_CleanData",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@greater(activity('AF_CleanData').output.dirtyRowCount,0)",
+									"type": "Expression"
+								},
+								"ifTrueActivities": [
+									{
+										"name": "WEB_SendEmailForDirtyRows",
+										"type": "WebActivity",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"method": "POST",
+											"headers": {
+												"Content-type": "application/json"
+											},
+											"url": {
+												"value": "@pipeline().parameters.LogicAppUrl",
+												"type": "Expression"
+											},
+											"body": {
+												"value": "@json(concat(\n    '{\"toEmail\":\"', pipeline().parameters.NotificationEmail,\n    '\",\"subject\":\"⚠️ Unclenable Data Found in: ', item().name,\n    '\",\"fileName\":\"', item().name,\n    '\",\"folderPath\":\"', pipeline().parameters.FolderPath,\n    '\",\"cleanRowCount\":', string(activity('AF_CleanData').output.cleanRowCount),\n    ',\"dirtyRowCount\":', string(activity('AF_CleanData').output.dirtyRowCount),\n    ',\"dirtyRowDetails\":', string(activity('AF_CleanData').output.dirtyRowDetails),\n    '}'\n))",
+												"type": "Expression"
+											}
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "CPY_LoadCleanDataToSQL",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "IF_HasDirtyRows",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "AzureBlobStorageReadSettings",
+										"recursive": true,
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"sink": {
+									"type": "AzureSqlSink",
+									"writeBehavior": "insert",
+									"sqlWriterUseTableLock": false
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_Blob_CSV",
+									"type": "DatasetReference",
+									"parameters": {
+										"FolderPath": {
+											"value": "staging/@{pipeline().parameters.FolderPath}",
+											"type": "Expression"
+										},
+										"FileName": "@{item().name}_cleaned.csv"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_SQL_Table",
+									"type": "DatasetReference",
+									"parameters": {
+										"TableName": {
+											"value": "@pipeline().parameters.TargetTableName",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"FolderPath": {
+				"type": "string"
+			},
+			"TargetTableName": {
+				"type": "string"
+			},
+			"ContainerName": {
+				"type": "string"
+			},
+			"NotificationEmail": {
+				"type": "string"
+			},
+			"LogicAppUrl": {
+				"type": "string"
+			}
+		},
+		"annotations": []
+	}
+}
