@@ -1,0 +1,14 @@
+{
+	"name": "LS_AzureSQL",
+	"properties": {
+		"annotations": [],
+		"type": "AzureSqlDatabase",
+		"typeProperties": {
+			"server": "sakshidp.database.windows.net",
+			"database": "db-pipeline",
+			"encrypt": "mandatory",
+			"trustServerCertificate": true,
+			"authenticationType": "SystemAssignedManagedIdentity"
+		}
+	}
+}
