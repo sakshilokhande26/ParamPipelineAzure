@@ -1,0 +1,9 @@
+{
+	"name": "adf-data-pipeline-sakshi",
+	"location": "centralindia",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "6c88b533-a642-445f-98cf-70f0699a0b92",
+		"tenantId": "d054ec41-416e-448d-ac9a-2f4046c9b3b2"
+	}
+}
