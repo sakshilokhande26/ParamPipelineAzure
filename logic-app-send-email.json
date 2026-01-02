@@ -1,0 +1,95 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "triggers": {
+            "When_an_HTTP_request_is_received": {
+                "type": "Request",
+                "kind": "Http",
+                "inputs": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "toEmail": {
+                                "type": "string"
+                            },
+                            "subject": {
+                                "type": "string"
+                            },
+                            "fileName": {
+                                "type": "string"
+                            },
+                            "folderPath": {
+                                "type": "string"
+                            },
+                            "dirtyRowCount": {
+                                "type": "integer"
+                            },
+                            "cleanRowCount": {
+                                "type": "integer"
+                            },
+                            "dirtyRowDetails": {
+                                "type": "array"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "actions": {
+            "Send_email_(V2)": {
+                "type": "ApiConnection",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['gmail']['connectionId']"
+                        }
+                    },
+                    "method": "post",
+                    "body": {
+                        "To": "@triggerBody()?['toEmail']",
+                        "Subject": "@triggerBody()?['subject']",
+                        "Body": "<p class=\"editor-paragraph\"><b><strong class=\"editor-text-bold\" style=\"font-size: 16px;\">Data Quality Alert - Uncleanable Data Detected</strong></b></p><br><p class=\"editor-paragraph\">File Name: @{triggerBody()?['fileName']}</p><br><p class=\"editor-paragraph\">Folder Path: @{triggerBody()?['folderPath']}</p><br><p class=\"editor-paragraph\">Clean Rows: @{triggerBody()?['cleanRowCount']}</p><br><p class=\"editor-paragraph\">Dirty Rows (Cannot be cleaned):@{triggerBody()?['dirtyRowCount']}</p><br><p class=\"editor-paragraph\">@{triggerBody()?['dirtyRowDetails']}</p><br><br>"
+                    },
+                    "path": "/v2/Mail"
+                },
+                "runAfter": {}
+            },
+            "Response": {
+                "type": "Response",
+                "kind": "Http",
+                "inputs": {
+                    "statusCode": 200,
+                    "body": {
+                        "status": "Email sent successfully"
+                    }
+                },
+                "runAfter": {
+                    "Send_email_(V2)": [
+                        "Succeeded"
+                    ]
+                }
+            }
+        },
+        "outputs": {},
+        "parameters": {
+            "$connections": {
+                "type": "Object",
+                "defaultValue": {}
+            }
+        }
+    },
+    "parameters": {
+        "$connections": {
+            "type": "Object",
+            "value": {
+                "gmail": {
+                    "id": "/subscriptions/113c5c83-9030-48a2-b8b8-e9587039c1f7/providers/Microsoft.Web/locations/centralindia/managedApis/gmail",
+                    "connectionId": "/subscriptions/113c5c83-9030-48a2-b8b8-e9587039c1f7/resourceGroups/sakshiRGDemo/providers/Microsoft.Web/connections/gmail-1",
+                    "connectionName": "gmail-1",
+                    "connectionProperties": {}
+                }
+            }
+        }
+    }
+}
