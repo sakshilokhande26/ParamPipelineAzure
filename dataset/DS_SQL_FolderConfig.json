@@ -1,0 +1,34 @@
+{
+	"name": "DS_SQL_FolderConfig",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_AzureSQL",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "ConfigID",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "FolderPath",
+				"type": "nvarchar"
+			},
+			{
+				"name": "TargetTableName",
+				"type": "nvarchar"
+			},
+			{
+				"name": "IsActive",
+				"type": "bit"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "FolderConfig"
+		}
+	}
+}
