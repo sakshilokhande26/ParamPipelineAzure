@@ -1,0 +1,108 @@
+{
+	"name": "PL_Master",
+	"properties": {
+		"activities": [
+			{
+				"name": "LKP_GetFolderConfig",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT FolderPath, TargetTableName FROM dbo.FolderConfig WHERE IsActive = 1",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_SQL_FolderConfig",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "FE_ProcessEachFolder",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "LKP_GetFolderConfig",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('LKP_GetFolderConfig').output.value",
+						"type": "Expression"
+					},
+					"batchCount": 3,
+					"activities": [
+						{
+							"name": "EP_ProcessFilesInFolder",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"policy": {
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL_ProcessFiles",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"FolderPath": {
+										"value": "@item().FolderPath",
+										"type": "Expression"
+									},
+									"TargetTableName": {
+										"value": "@item().TargetTableName",
+										"type": "Expression"
+									},
+									"ContainerName": {
+										"value": "@pipeline().parameters.ContainerName",
+										"type": "Expression"
+									},
+									"NotificationEmail": {
+										"value": "@pipeline().parameters.NotificationEmail",
+										"type": "Expression"
+									},
+									"LogicAppUrl": {
+										"value": "@pipeline().parameters.LogicAppUrl",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"ContainerName": {
+				"type": "string"
+			},
+			"NotificationEmail": {
+				"type": "string"
+			},
+			"LogicAppUrl": {
+				"type": "string"
+			}
+		},
+		"annotations": []
+	}
+}
